@@ -78,6 +78,11 @@ func DefaultStaticTokens() StaticTokens {
 	}
 }
 
+// GetVersion returns resource version
+func (c *StaticTokensV2) GetVersion() string {
+	return c.Version
+}
+
 // GetKind returns resource kind
 func (c *StaticTokensV2) GetKind() string {
 	return c.Kind

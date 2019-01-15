@@ -85,6 +85,11 @@ type RemoteClusterStatusV3 struct {
 	LastHeartbeat time.Time `json:"last_heartbeat"`
 }
 
+// GetVersion returns resource version
+func (c *RemoteClusterV3) GetVersion() string {
+	return c.Version
+}
+
 // GetKind returns resource kind
 func (c *RemoteClusterV3) GetKind() string {
 	return c.Kind

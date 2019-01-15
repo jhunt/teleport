@@ -279,6 +279,11 @@ func CertAuthoritiesToV1(in []CertAuthority) ([]CertAuthorityV1, error) {
 	return out, nil
 }
 
+// GetVersion returns resource version
+func (c *CertAuthorityV2) GetVersion() string {
+	return c.Version
+}
+
 // GetKind returns resource kind
 func (c *CertAuthorityV2) GetKind() string {
 	return c.Kind

@@ -280,6 +280,11 @@ type EmptyResource struct {
 	Metadata Metadata `json:"metadata"`
 }
 
+// GetVersion returns resource version
+func (r *EmptyResource) GetVersion() string {
+	return r.Version
+}
+
 // GetSubKind returns resource sub kind
 func (r *EmptyResource) GetSubKind() string {
 	return r.SubKind

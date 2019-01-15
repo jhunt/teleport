@@ -133,6 +133,11 @@ func (p *ProvisionTokenV2) CheckAndSetDefaults() error {
 	return nil
 }
 
+// GetVersion returns resource version
+func (p *ProvisionTokenV2) GetVersion() string {
+	return p.Version
+}
+
 // GetRoles returns a list of teleport roles
 // that will be granted to the user of the token
 // in the crendentials

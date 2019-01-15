@@ -66,6 +66,11 @@ func ServersToV1(in []Server) []ServerV1 {
 	return out
 }
 
+// GetVersion returns resource version
+func (s *ServerV2) GetVersion() string {
+	return s.Version
+}
+
 // GetKind returns resource kind
 func (s *ServerV2) GetKind() string {
 	return s.Kind
@@ -542,7 +547,9 @@ func UnmarshalServerResource(data []byte, kind string, cfg *MarshalConfig) (Serv
 			return nil, trace.Wrap(err)
 		}
 		s.Kind = kind
-		return s.V2(), nil
+		v2 := s.V2()
+		v2.SetResourceID(cfg.ID)
+		return v2, nil
 	case V2:
 		var s ServerV2
 
@@ -559,10 +566,11 @@ func UnmarshalServerResource(data []byte, kind string, cfg *MarshalConfig) (Serv
 		if err := s.CheckAndSetDefaults(); err != nil {
 			return nil, trace.Wrap(err)
 		}
+		s.SetResourceID(cfg.ID)
 
 		return &s, nil
 	}
-	return nil, trace.BadParameter("server resource version %v is not supported", h.Version)
+	return nil, trace.BadParameter("server resource version %q is not supported", h.Version)
 }
 
 var serverMarshaler ServerMarshaler = &TeleportServerMarshaler{}

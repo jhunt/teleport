@@ -61,6 +61,11 @@ func NewClusterName(spec ClusterNameSpecV2) (ClusterName, error) {
 	return &cn, nil
 }
 
+// GetVersion returns resource version
+func (c *ClusterNameV2) GetVersion() string {
+	return c.Version
+}
+
 // GetKind returns resource kind
 func (c *ClusterNameV2) GetKind() string {
 	return c.Kind

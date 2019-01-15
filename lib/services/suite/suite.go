@@ -956,6 +956,24 @@ func (s *ServicesTestSuite) ClusterConfig(c *check.C, opts ...SuiteOption) {
 
 // Events tests various events variations
 func (s *ServicesTestSuite) Events(c *check.C) {
+	testCases := []eventTest{
+		{
+			kind: services.WatchKind{
+				Kind:        services.KindCertAuthority,
+				LoadSecrets: true,
+			},
+			crud: func() services.Resource {
+				ca := NewTestCA(services.UserCA, "example.com")
+				c.Assert(s.CAS.UpsertCertAuthority(ca), check.IsNil)
+
+				out, err := s.CAS.GetCertAuthority(*ca.ID(), false)
+				c.Assert(err, check.IsNil)
+
+				c.Assert(s.CAS.DeleteCertAuthority(*ca.ID()), check.IsNil)
+				return out
+			},
+		},
+	}
 	ctx := context.TODO()
 	w, err := s.EventsS.NewWatcher(ctx, services.Watch{
 		Kinds: []services.WatchKind{
@@ -971,35 +989,36 @@ func (s *ServicesTestSuite) Events(c *check.C) {
 		c.Fatalf("timeout waiting for init event")
 	}
 
-	ca := NewTestCA(services.UserCA, "example.com")
-	c.Assert(s.CAS.UpsertCertAuthority(ca), check.IsNil)
+	for i, tc := range testCases {
+		comment := check.Commentf("test case %v; kind: %v, load secrets %v", i, tc.kind.Kind, tc.kind.LoadSecrets)
+		resource := tc.crud()
 
-	out, err := s.CAS.GetCertAuthority(*ca.ID(), false)
-	c.Assert(err, check.IsNil)
-
-	c.Assert(s.CAS.DeleteCertAuthority(*ca.ID()), check.IsNil)
-
-	select {
-	case event := <-w.Events():
-		c.Assert(event.Type, check.Equals, backend.OpPut)
-		fixtures.DeepCompare(c, event.Resource, out)
-	case <-time.After(2 * time.Second):
-		c.Fatalf("timeout waiting for event")
-	}
-
-	select {
-	case event := <-w.Events():
-		c.Assert(event.Type, check.Equals, backend.OpDelete)
-		header := &services.ResourceHeader{
-			Kind:     services.KindCertAuthority,
-			SubKind:  string(services.UserCA),
-			Version:  services.V3,
-			Metadata: ca.GetMetadata(),
+		select {
+		case event := <-w.Events():
+			c.Assert(event.Type, check.Equals, backend.OpPut, comment)
+			fixtures.DeepCompare(c, event.Resource, resource)
+		case <-time.After(2 * time.Second):
+			c.Fatalf("timeout waiting for event", comment)
 		}
-		c.Assert(header, check.NotNil)
-		fixtures.DeepCompare(c, event.Resource, header)
-	case <-time.After(2 * time.Second):
-		c.Fatalf("timeout waiting for event")
-	}
 
+		select {
+		case event := <-w.Events():
+			c.Assert(event.Type, check.Equals, backend.OpDelete, comment)
+			header := &services.ResourceHeader{
+				Kind:     resource.GetKind(),
+				SubKind:  resource.GetSubKind(),
+				Version:  resource.GetVersion(),
+				Metadata: resource.GetMetadata(),
+			}
+			c.Assert(header, check.NotNil)
+			fixtures.DeepCompare(c, event.Resource, header)
+		case <-time.After(2 * time.Second):
+			c.Fatalf("timeout waiting for event", comment)
+		}
+	}
+}
+
+type eventTest struct {
+	kind services.WatchKind
+	crud func() services.Resource
 }

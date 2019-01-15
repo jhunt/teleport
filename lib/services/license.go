@@ -101,6 +101,11 @@ type LicenseV3 struct {
 	Spec LicenseSpecV3 `json:"spec"`
 }
 
+// GetVersion returns resource version
+func (c *LicenseV3) GetVersion() string {
+	return c.Version
+}
+
 // GetSubKind returns resource sub kind
 func (c *LicenseV3) GetSubKind() string {
 	return c.SubKind

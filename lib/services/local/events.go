@@ -71,6 +71,34 @@ func (e *EventsService) NewWatcher(ctx context.Context, watch services.Watch) (s
 			prefix := []byte(backend.Key(clusterConfigPrefix, namePrefix))
 			prefixes = append(prefixes, prefix)
 			parsers = append(parsers, parser{prefix: prefix, parser: parseClusterName})
+		case services.KindNamespace:
+			prefix := []byte(backend.Key(namespacesPrefix))
+			prefixes = append(prefixes, prefix)
+			parsers = append(parsers, parser{prefix: prefix, parser: parseNamespace})
+		case services.KindRole:
+			prefix := []byte(backend.Key(rolesPrefix))
+			prefixes = append(prefixes, prefix)
+			parsers = append(parsers, parser{prefix: prefix, parser: parseRole})
+		case services.KindUser:
+			prefix := []byte(backend.Key(webPrefix, usersPrefix))
+			prefixes = append(prefixes, prefix)
+			parsers = append(parsers, parser{prefix: prefix, parser: parseUser})
+		case services.KindNode:
+			prefix := []byte(backend.Key(namespacesPrefix, defaults.Namespace, nodesPrefix))
+			prefixes = append(prefixes, prefix)
+			parsers = append(parsers, parser{prefix: prefix, parser: parseNode})
+		case services.KindProxy:
+			prefix := []byte(backend.Key(proxiesPrefix))
+			prefixes = append(prefixes, prefix)
+			parsers = append(parsers, parser{prefix: prefix, parser: parseProxy})
+		case services.KindTunnelConnection:
+			prefix := []byte(backend.Key(tunnelConnectionsPrefix))
+			prefixes = append(prefixes, prefix)
+			parsers = append(parsers, parser{prefix: prefix, parser: parseTunnelConnection})
+		case services.KindReverseTunnel:
+			prefix := []byte(backend.Key(reverseTunnelsPrefix))
+			prefixes = append(prefixes, prefix)
+			parsers = append(parsers, parser{prefix: prefix, parser: parseReverseTunnel})
 		default:
 			return nil, trace.BadParameter("watcher on object kind %q is not supported", kind)
 		}
@@ -200,18 +228,7 @@ func (p *certAuthorityParser) parseCertAuthority(event backend.Event) (services.
 func parseProvisionToken(event backend.Event) (services.Resource, error) {
 	switch event.Type {
 	case backend.OpDelete:
-		name, err := base(event.Item.Key)
-		if err != nil {
-			return nil, trace.Wrap(err)
-		}
-		return &services.ResourceHeader{
-			Kind:    services.KindToken,
-			Version: services.V2,
-			Metadata: services.Metadata{
-				Name:      string(name),
-				Namespace: defaults.Namespace,
-			},
-		}, nil
+		return resourceHeader(event, services.KindToken, services.V2)
 	case backend.OpPut:
 		token, err := services.UnmarshalProvisionToken(event.Item.Value,
 			services.WithResourceID(event.Item.ID))
@@ -227,18 +244,7 @@ func parseProvisionToken(event backend.Event) (services.Resource, error) {
 func parseStaticTokens(event backend.Event) (services.Resource, error) {
 	switch event.Type {
 	case backend.OpDelete:
-		name, err := base(event.Item.Key)
-		if err != nil {
-			return nil, trace.Wrap(err)
-		}
-		return &services.ResourceHeader{
-			Kind:    services.KindStaticTokens,
-			Version: services.V2,
-			Metadata: services.Metadata{
-				Name:      string(name),
-				Namespace: defaults.Namespace,
-			},
-		}, nil
+		return resourceHeader(event, services.KindStaticTokens, services.V2)
 	case backend.OpPut:
 		tokens, err := services.GetStaticTokensMarshaler().Unmarshal(event.Item.Value,
 			services.WithResourceID(event.Item.ID))
@@ -254,18 +260,7 @@ func parseStaticTokens(event backend.Event) (services.Resource, error) {
 func parseClusterConfig(event backend.Event) (services.Resource, error) {
 	switch event.Type {
 	case backend.OpDelete:
-		name, err := base(event.Item.Key)
-		if err != nil {
-			return nil, trace.Wrap(err)
-		}
-		return &services.ResourceHeader{
-			Kind:    services.KindClusterConfig,
-			Version: services.V2,
-			Metadata: services.Metadata{
-				Name:      string(name),
-				Namespace: defaults.Namespace,
-			},
-		}, nil
+		return resourceHeader(event, services.KindClusterConfig, services.V2)
 	case backend.OpPut:
 		clusterConfig, err := services.GetClusterConfigMarshaler().Unmarshal(event.Item.Value,
 			services.WithResourceID(event.Item.ID))
@@ -281,18 +276,7 @@ func parseClusterConfig(event backend.Event) (services.Resource, error) {
 func parseClusterName(event backend.Event) (services.Resource, error) {
 	switch event.Type {
 	case backend.OpDelete:
-		name, err := base(event.Item.Key)
-		if err != nil {
-			return nil, trace.Wrap(err)
-		}
-		return &services.ResourceHeader{
-			Kind:    services.KindClusterName,
-			Version: services.V2,
-			Metadata: services.Metadata{
-				Name:      string(name),
-				Namespace: defaults.Namespace,
-			},
-		}, nil
+		return resourceHeader(event, services.KindClusterName, services.V2)
 	case backend.OpPut:
 		clusterName, err := services.GetClusterNameMarshaler().Unmarshal(event.Item.Value,
 			services.WithResourceID(event.Item.ID))
@@ -303,6 +287,126 @@ func parseClusterName(event backend.Event) (services.Resource, error) {
 	default:
 		return nil, trace.BadParameter("event %v is not supported", event.Type)
 	}
+}
+
+func parseNamespace(event backend.Event) (services.Resource, error) {
+	switch event.Type {
+	case backend.OpDelete:
+		return resourceHeader(event, services.KindNamespace, services.V2)
+	case backend.OpPut:
+		namespace, err := services.UnmarshalNamespace(event.Item.Value,
+			services.WithResourceID(event.Item.ID))
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		return namespace, nil
+	default:
+		return nil, trace.BadParameter("event %v is not supported", event.Type)
+	}
+}
+
+func parseRole(event backend.Event) (services.Resource, error) {
+	switch event.Type {
+	case backend.OpDelete:
+		return resourceHeader(event, services.KindRole, services.V3)
+	case backend.OpPut:
+		resource, err := services.GetRoleMarshaler().UnmarshalRole(event.Item.Value,
+			services.WithResourceID(event.Item.ID))
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		return resource, nil
+	default:
+		return nil, trace.BadParameter("event %v is not supported", event.Type)
+	}
+}
+
+func parseUser(event backend.Event) (services.Resource, error) {
+	switch event.Type {
+	case backend.OpDelete:
+		return resourceHeader(event, services.KindUser, services.V2)
+	case backend.OpPut:
+		resource, err := services.GetUserMarshaler().UnmarshalUser(event.Item.Value,
+			services.WithResourceID(event.Item.ID))
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		return resource, nil
+	default:
+		return nil, trace.BadParameter("event %v is not supported", event.Type)
+	}
+}
+
+func parseNode(event backend.Event) (services.Resource, error) {
+	return parseServer(event, services.KindNode)
+}
+
+func parseProxy(event backend.Event) (services.Resource, error) {
+	return parseServer(event, services.KindProxy)
+}
+
+func parseTunnelConnection(event backend.Event) (services.Resource, error) {
+	switch event.Type {
+	case backend.OpDelete:
+		return resourceHeader(event, services.KindTunnelConnection, services.V2)
+	case backend.OpPut:
+		resource, err := services.UnmarshalTunnelConnection(event.Item.Value,
+			services.WithResourceID(event.Item.ID))
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		return resource, nil
+	default:
+		return nil, trace.BadParameter("event %v is not supported", event.Type)
+	}
+}
+
+func parseReverseTunnel(event backend.Event) (services.Resource, error) {
+	switch event.Type {
+	case backend.OpDelete:
+		return resourceHeader(event, services.KindReverseTunnel, services.V2)
+	case backend.OpPut:
+		resource, err := services.UnmarshalReverseTunnel(event.Item.Value,
+			services.WithResourceID(event.Item.ID))
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		return resource, nil
+	default:
+		return nil, trace.BadParameter("event %v is not supported", event.Type)
+	}
+}
+
+func parseServer(event backend.Event, kind string) (services.Resource, error) {
+	switch event.Type {
+	case backend.OpDelete:
+		return resourceHeader(event, kind, services.V2)
+	case backend.OpPut:
+		resource, err := services.GetServerMarshaler().UnmarshalServer(event.Item.Value,
+			kind,
+			services.WithResourceID(event.Item.ID))
+		if err != nil {
+			return nil, trace.Wrap(err)
+		}
+		return resource, nil
+	default:
+		return nil, trace.BadParameter("event %v is not supported", event.Type)
+	}
+}
+
+func resourceHeader(event backend.Event, kind, version string) (services.Resource, error) {
+	name, err := base(event.Item.Key)
+	if err != nil {
+		return nil, trace.Wrap(err)
+	}
+	return &services.ResourceHeader{
+		Kind:    kind,
+		Version: version,
+		Metadata: services.Metadata{
+			Name:      string(name),
+			Namespace: defaults.Namespace,
+		},
+	}, nil
 }
 
 // base returns last element delimited by separator

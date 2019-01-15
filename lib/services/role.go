@@ -372,6 +372,11 @@ func applyValueTraits(val string, traits map[string][]string) ([]string, error) 
 	return append([]string{}, variableValues...), nil
 }
 
+// GetVersion returns resource version
+func (r *RoleV3) GetVersion() string {
+	return r.Version
+}
+
 // GetKind returns resource kind
 func (r *RoleV3) GetKind() string {
 	return r.Kind
@@ -935,6 +940,11 @@ type RoleV2 struct {
 	Metadata Metadata `json:"metadata"`
 	// Spec contains role specification
 	Spec RoleSpecV2 `json:"spec"`
+}
+
+// GetVersion returns resource version
+func (r *RoleV2) GetVersion() string {
+	return r.Version
 }
 
 // GetKind returns resource kind
@@ -2144,11 +2154,16 @@ func GetRoleSchema(version string, extensionSchema string) string {
 }
 
 // UnmarshalRole unmarshals role from JSON, sets defaults, and checks schema.
-func UnmarshalRole(data []byte) (*RoleV3, error) {
+func UnmarshalRole(data []byte, opts ...MarshalOption) (*RoleV3, error) {
 	var h ResourceHeader
 	err := json.Unmarshal(data, &h)
 	if err != nil {
 		h.Version = V2
+	}
+
+	cfg, err := collectOptions(opts)
+	if err != nil {
+		return nil, trace.Wrap(err)
 	}
 
 	switch h.Version {
@@ -2163,16 +2178,25 @@ func UnmarshalRole(data []byte) (*RoleV3, error) {
 		}
 
 		roleV3 := role.V3()
+		roleV3.SetResourceID(cfg.ID)
 		return roleV3, nil
 	case V3:
 		var role RoleV3
-		if err := utils.UnmarshalWithSchema(GetRoleSchema(V3, ""), &role, data); err != nil {
-			return nil, trace.BadParameter(err.Error())
+		if cfg.SkipValidation {
+			if err := utils.FastUnmarshal(data, &role); err != nil {
+				return nil, trace.BadParameter(err.Error())
+			}
+		} else {
+			if err := utils.UnmarshalWithSchema(GetRoleSchema(V3, ""), &role, data); err != nil {
+				return nil, trace.BadParameter(err.Error())
+			}
 		}
 
 		if err := role.CheckAndSetDefaults(); err != nil {
 			return nil, trace.Wrap(err)
 		}
+
+		role.SetResourceID(cfg.ID)
 
 		return &role, nil
 	}
@@ -2198,7 +2222,7 @@ func GetRoleMarshaler() RoleMarshaler {
 // mostly adds support for extended versions
 type RoleMarshaler interface {
 	// UnmarshalRole from binary representation
-	UnmarshalRole(bytes []byte) (Role, error)
+	UnmarshalRole(bytes []byte, opts ...MarshalOption) (Role, error)
 	// MarshalRole to binary representation
 	MarshalRole(u Role, opts ...MarshalOption) ([]byte, error)
 }
@@ -2206,8 +2230,8 @@ type RoleMarshaler interface {
 type TeleportRoleMarshaler struct{}
 
 // UnmarshalRole unmarshals role from JSON.
-func (*TeleportRoleMarshaler) UnmarshalRole(bytes []byte) (Role, error) {
-	return UnmarshalRole(bytes)
+func (*TeleportRoleMarshaler) UnmarshalRole(bytes []byte, opts ...MarshalOption) (Role, error) {
+	return UnmarshalRole(bytes, opts...)
 }
 
 // MarshalRole marshalls role into JSON.

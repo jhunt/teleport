@@ -171,6 +171,11 @@ const (
 	HostKeyCheckNo string = "no"
 )
 
+// GetVersion returns resource version
+func (c *ClusterConfigV3) GetVersion() string {
+	return c.Version
+}
+
 // GetSubKind returns resource subkind
 func (c *ClusterConfigV3) GetSubKind() string {
 	return c.SubKind
